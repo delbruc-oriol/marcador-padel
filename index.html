@@ -1,160 +1,171 @@
-<!DOCTYPE html>
-<html lang="es">
+<!doctype html>
+<html lang="ca">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Marcador Pàdel/Tennis - PWA</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0066ff">
-<link rel="icon" href="icon-192.png">
-<style>
-  body { font-family: Arial, sans-serif; text-align: center; background: #f4f4f4; margin: 0; padding: 0; }
-  h1 { margin: 10px; }
-  .container { display: flex; justify-content: space-around; align-items: flex-start; padding: 20px; gap: 20px; flex-wrap: wrap; }
-  .team { flex: 1 1 300px; padding: 20px; border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-  .blue-team { background: #0066ff22; }
-  .red-team  { background: #ff000022; }
-  .players { font-size: 1.5em; margin-bottom: 15px; display: flex; flex-direction: column; align-items: center;}
-  .player { position: relative; }
-  .serve-icon { position: absolute; left: -30px; font-size: 1.2em; }
-  input { font-size: 1em; text-align: center; border: none; background: transparent; border-bottom: 1px solid #ccc; margin: 5px 0; width: 80%; }
-  .score { font-size: 10vw; font-weight: bold; margin: 20px 0; }
-  .games, .sets { font-size: 2em; margin: 10px 0; }
-  .controls button { padding: 12px 20px; margin: 5px; font-size: 1em; border-radius: 12px; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-  .blue-btn { background: #0066ff; color: #fff; }
-  .red-btn { background: #ff0000; color: #fff; }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Marcador Pàdel</title>
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <meta name="description" content="Marcador de pàdel per tablet (PWA) amb control per veu, equips Blau i Vermell.">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<h1>Marcador Pàdel/Tennis</h1>
-
-<div class="container">
-  <div class="team blue-team">
-    <div class="players">
-      <div class="player"><span id="serveBlue1" class="serve-icon"></span><input id="bluePlayer1" value="Jugador 1"></div>
-      <div class="player"><span id="serveBlue2" class="serve-icon"></span><input id="bluePlayer2" value="Jugador 2"></div>
+  <div class="app">
+    <div class="header">
+      <div class="title">Marcador Pàdel</div>
+      <div class="controls">
+        <button id="micToggle" aria-pressed="false" title="Micròfon actiu/inactiu">
+          <span class="icon">🎤</span><span>Micròfon</span><span id="micStatus" class="badge">OFF</span>
+        </button>
+        <button id="soundToggle" aria-pressed="true" title="So actiu/inactiu">
+          <span class="icon">🔊</span><span>So</span><span id="soundStatus" class="badge">ON</span>
+        </button>
+        <button id="resetMatch" title="Reiniciar el partit">
+          <span class="icon">🗑️</span><span>Reiniciar</span>
+        </button>
+        <button id="undoPoint" title="Retrocedir el punt anterior">
+          <span class="icon">↩️</span><span>Desfer Punt</span>
+        </button>
+        <button id="randomTeams" title="Equips aleatoris (draft 3s)">
+          <span class="icon">🎲</span><span>Equips aleatoris</span>
+        </button>
+        <button id="changeOrder" title="Canvi ordre servei (drag & drop)">
+          <span class="icon">🔀</span><span>Ordre servei</span>
+        </button>
+        <button id="randomServe" title="Sorteig sac aleatori">
+          <span class="icon">🪙</span><span>Sorteig sac</span>
+        </button>
+      </div>
     </div>
-    <div id="blueScore" class="score" style="color:#0066ff">0</div>
-    <div id="blueGames" class="games">Jocs: 0</div>
-    <div id="blueSets" class="sets">Sets: 0</div>
-    <div class="controls">
-      <button class="blue-btn" onclick="addPoint('blue')">+ Azul</button>
+
+    <div class="grid">
+      <!-- Team Blue -->
+      <section class="team blue">
+        <div class="team-header">
+          <div class="team-name">
+            <span class="pill blue">BLAU</span>
+          </div>
+          <div class="badge">Esquerra</div>
+        </div>
+
+        <div class="score-row">
+          <div class="score left" id="scoreBlue">0</div>
+          <div class="score right" id="scoreRedGhost" style="opacity:.08">00</div>
+        </div>
+
+        <div class="players">
+          <div class="player" id="blueP1Row">
+            <input id="blueP1" value="Blau 1" aria-label="Nom jugador Blau 1">
+            <span class="order" id="blueP1Order">1</span>
+          </div>
+          <div class="player" id="blueP2Row">
+            <input id="blueP2" value="Blau 2" aria-label="Nom jugador Blau 2">
+            <span class="order" id="blueP2Order">3</span>
+          </div>
+        </div>
+
+        <div class="main-actions">
+          <button id="addBlue"><span class="icon">➕</span>Punt Blau</button>
+        </div>
+
+        <div class="meta">
+          <div class="meta-box">
+            <div class="meta-title">Jocs (Blue)</div>
+            <div class="meta-value" id="gamesBlue">0</div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-title">Sets (Blue)</div>
+            <div class="meta-value" id="setsBlue">0</div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-title">Jocs (Red)</div>
+            <div class="meta-value" id="gamesRed">0</div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-title">Sets (Red)</div>
+            <div class="meta-value" id="setsRed">0</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Team Red -->
+      <section class="team red">
+        <div class="team-header">
+          <div class="team-name">
+            <span class="pill red">VERMELL</span>
+          </div>
+          <div class="badge">Dreta</div>
+        </div>
+
+        <div class="score-row">
+          <div class="score left" id="scoreBlueGhost" style="opacity:.08">00</div>
+          <div class="score right" id="scoreRed">0</div>
+        </div>
+
+        <div class="players">
+          <div class="player" id="redP1Row">
+            <input id="redP1" value="Vermell 1" aria-label="Nom jugador Vermell 1">
+            <span class="order" id="redP1Order">2</span>
+          </div>
+          <div class="player" id="redP2Row">
+            <input id="redP2" value="Vermell 2" aria-label="Nom jugador Vermell 2">
+            <span class="order" id="redP2Order">4</span>
+          </div>
+        </div>
+
+        <div class="main-actions">
+          <button id="addRed"><span class="icon">➕</span>Punt Vermell</button>
+        </div>
+
+        <div class="meta">
+          <div class="meta-box">
+            <div class="meta-title">Jocs (Blue)</div>
+            <div class="meta-value" id="gamesBlue2">0</div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-title">Sets (Blue)</div>
+            <div class="meta-value" id="setsBlue2">0</div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-title">Jocs (Red)</div>
+            <div class="meta-value" id="gamesRed2">0</div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-title">Sets (Red)</div>
+            <div class="meta-value" id="setsRed2">0</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="history">
+      <div class="row">
+        <div class="meta-title">Històric (Jocs per set)</div>
+        <span class="badge">Veure resultat de cada set</span>
+      </div>
+      <div id="historyList"></div>
+    </div>
+
+    <div class="footer-note">
+      Ordres de veu: “equipo rojo / equipo azul / cancelar punto” (ES) · “equip Vermell / equip Blau / cancelar punt” (CA)
     </div>
   </div>
 
-  <div class="team red-team">
-    <div class="players">
-      <div class="player"><span id="serveRed1" class="serve-icon"></span><input id="redPlayer1" value="Jugador 3"></div>
-      <div class="player"><span id="serveRed2" class="serve-icon"></span><input id="redPlayer2" value="Jugador 4"></div>
-    </div>
-    <div id="redScore" class="score" style="color:#ff0000">0</div>
-    <div id="redGames" class="games">Jocs: 0</div>
-    <div id="redSets" class="sets">Sets: 0</div>
-    <div class="controls">
-      <button class="red-btn" onclick="addPoint('red')">+ Rojo</button>
+  <!-- Modal for order -->
+  <div class="modal-backdrop" id="orderModal">
+    <div class="modal">
+      <div class="modal-title">Canviar ordre de servei</div>
+      <div class="sortable" id="sortableList"></div>
+      <div class="drag-hint">Arrossega per ordenar (1 → 4). Els colors indiquen l'equip.</div>
+      <div class="actions" style="margin-top:10px; justify-content:flex-end">
+        <button id="cancelOrder">Cancel·lar</button>
+        <button id="saveOrder" class="btn"><span class="icon">💾</span>Desar</button>
+      </div>
     </div>
   </div>
-</div>
 
-<div class="controls">
-  <button onclick="undoLast()">↩ Desfer</button>
-  <button onclick="resetMatch()">⟳ Reiniciar</button>
-  <button onclick="toggleServerOrder()">🔄 Canviar ordre servei</button>
-  <button onclick="randomTeams()">🎲 Equips aleatoris</button>
-</div>
-
-<script>
-let pointSequence = [0,15,30,40,'AD'];
-let scores={blue:0,red:0}, games={blue:0,red:0}, sets={blue:0,red:0}, history=[];
-let currentServer = 'blue1';
-let serverOrder = ['blue1','blue2','red1','red2'];
-let serverIndex = 0;
-
-function getDisplayScore(team){
-  let opp = (team==='blue')?'red':'blue';
-  if(scores[team]<=3 && scores[opp]<=3 && !(scores[team]==3 && scores[opp]==3)){
-    return pointSequence[scores[team]];
-  }
-  if(scores[team]>=3 && scores[opp]>=3){
-    if(scores[team]==scores[opp]) return '40';
-    if(scores[team]==scores[opp]+1) return 'AD';
-    if(scores[opp]==scores[team]+1) return '40';
-  }
-  return pointSequence[Math.min(scores[team],4)];
-}
-
-function updateDisplay(){
-  document.getElementById("blueScore").innerText=getDisplayScore('blue');
-  document.getElementById("redScore").innerText=getDisplayScore('red');
-  document.getElementById("blueGames").innerText="Jocs: "+games.blue;
-  document.getElementById("redGames").innerText="Jocs: "+games.red;
-  document.getElementById("blueSets").innerText="Sets: "+sets.blue;
-  document.getElementById("redSets").innerText="Sets: "+sets.red;
-  document.querySelectorAll('.serve-icon').forEach(e=>e.innerText='');
-  document.getElementById('serve'+currentServer.charAt(0).toUpperCase()+currentServer.slice(1)).innerText='🎾';
-}
-
-function addPoint(team){
-  history.push({scores:{...scores},games:{...games},sets:{...sets},serverIndex});
-  let opp=(team==='blue')?'red':'blue';
-  scores[team]++;
-  if(checkGameWin(team,opp)){
-    scores.blue=0;scores.red=0;
-    games[team]++;
-    nextServer();
-  }
-  updateDisplay();
-}
-
-function checkGameWin(team,opp){
-  return (scores[team]>=4 && scores[team]>=scores[opp]+2);
-}
-
-function nextServer(){
-  serverIndex=(serverIndex+1)%serverOrder.length;
-  currentServer=serverOrder[serverIndex];
-}
-
-function undoLast(){
-  if(history.length>0){
-    let prev=history.pop();
-    scores=prev.scores; games=prev.games; sets=prev.sets; serverIndex=prev.serverIndex;
-    currentServer=serverOrder[serverIndex];
-    updateDisplay();
-  }
-}
-
-function resetMatch(){
-  if(!confirm("Reiniciar partit?")) return;
-  scores={blue:0,red:0}; games={blue:0,red:0}; sets={blue:0,red:0}; history=[];
-  currentServer='blue1'; serverIndex=0;
-  updateDisplay();
-}
-
-function toggleServerOrder(){
-  serverOrder.reverse();
-  alert("Ordre de servei canviat!");
-}
-
-function randomTeams(){
-  let players=[
-    document.getElementById('bluePlayer1').value,
-    document.getElementById('bluePlayer2').value,
-    document.getElementById('redPlayer1').value,
-    document.getElementById('redPlayer2').value
-  ];
-  players.sort(()=>Math.random()-0.5);
-  document.getElementById('bluePlayer1').value=players[0];
-  document.getElementById('bluePlayer2').value=players[1];
-  document.getElementById('redPlayer1').value=players[2];
-  document.getElementById('redPlayer2').value=players[3];
-}
-
-if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("service-worker.js").then(()=>console.log("Service Worker registrat!"));
-}
-
-updateDisplay();
-</script>
+  <script src="app.js"></script>
 </body>
 </html>

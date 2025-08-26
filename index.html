@@ -1,9 +1,12 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Marcador Pàdel - WebApp</title>
+<title>Marcador Pàdel - PWA</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0066ff">
+<link rel="icon" href="icon-192.png">
 <style>
   body { font-family: Arial, sans-serif; text-align: center; background: #f4f4f4; margin: 0; padding: 0; }
   h1 { margin: 10px; }
@@ -25,7 +28,6 @@
 <h1>Marcador Pàdel</h1>
 <div class="listen-indicator" id="listenIndicator"></div>
 
-
 <div class="container">
   <div class="team blue-team">
     <div class="players">
@@ -39,7 +41,6 @@
       <button class="blue-btn" onclick="addPoint('blue')">+ Azul</button>
     </div>
   </div>
-
 
   <div class="team red-team">
     <div class="players">
@@ -55,18 +56,15 @@
   </div>
 </div>
 
-
 <div class="controls">
   <button onclick="undoLast()">↩ Deshacer</button>
   <button onclick="resetMatch()">⟳ Reiniciar</button>
   <button onclick="toggleMic()">🎤 Micrófono</button>
 </div>
 
-
 <script>
 let scores={blue:0,red:0}, games={blue:0,red:0}, sets={blue:0,red:0}, history=[];
 let listening=false;
-
 
 function updateDisplay(){
   document.getElementById("blueScore").innerText=scores.blue;
@@ -77,13 +75,11 @@ function updateDisplay(){
   document.getElementById("redSets").innerText=sets.red;
 }
 
-
 function addPoint(team){
   history.push({scores:{...scores},games:{...games},sets:{...sets}});
   scores[team]++;
   updateDisplay();
 }
-
 
 function undoLast(){
   if(history.length>0){
@@ -93,25 +89,21 @@ function undoLast(){
   }
 }
 
-
 function resetMatch(){
   if(!confirm("¿Reiniciar partido?")) return;
   scores={blue:0,red:0}; games={blue:0,red:0}; sets={blue:0,red:0}; history=[];
   updateDisplay();
 }
 
-
 // ---- Reconocimiento de voz ----
 const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
 let recognition=null;
-
 
 if(SpeechRecognition){
   recognition=new SpeechRecognition();
   recognition.lang="es-ES";
   recognition.continuous=false; 
   recognition.interimResults=false;
-
 
   recognition.onresult=(event)=>{
     const transcript=event.results[0][0].transcript.toLowerCase();
@@ -121,13 +113,10 @@ if(SpeechRecognition){
     if(transcript.includes("cancelar")) undoLast();
   };
 
-
   recognition.onerror=(e)=>console.error("SpeechRecognition error:",e.error);
-
 
   recognition.onend=()=>{ if(listening) recognition.start(); };
 }
-
 
 function toggleMic(){
   if(!recognition){ alert("Reconocimiento no disponible."); return; }
@@ -140,6 +129,10 @@ function toggleMic(){
   }
 }
 
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js")
+    .then(() => console.log("Service Worker registrat!"));
+}
 
 updateDisplay();
 </script>

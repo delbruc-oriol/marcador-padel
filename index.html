@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Marcador Pàdel - PWA</title>
+<title>Marcador Pàdel/Tennis - PWA</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0066ff">
 <link rel="icon" href="icon-192.png">
@@ -14,29 +14,29 @@
   .team { flex: 1 1 300px; padding: 20px; border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
   .blue-team { background: #0066ff22; }
   .red-team  { background: #ff000022; }
-  .players { font-size: 1.5em; margin-bottom: 15px; }
+  .players { font-size: 1.5em; margin-bottom: 15px; display: flex; flex-direction: column; align-items: center;}
+  .player { position: relative; }
+  .serve-icon { position: absolute; left: -30px; font-size: 1.2em; }
   input { font-size: 1em; text-align: center; border: none; background: transparent; border-bottom: 1px solid #ccc; margin: 5px 0; width: 80%; }
   .score { font-size: 10vw; font-weight: bold; margin: 20px 0; }
   .games, .sets { font-size: 2em; margin: 10px 0; }
   .controls button { padding: 12px 20px; margin: 5px; font-size: 1em; border-radius: 12px; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
   .blue-btn { background: #0066ff; color: #fff; }
   .red-btn { background: #ff0000; color: #fff; }
-  .listen-indicator { width: 20px; height: 20px; border-radius: 50%; background: green; margin: 10px auto; display: none; }
 </style>
 </head>
 <body>
-<h1>Marcador Pàdel</h1>
-<div class="listen-indicator" id="listenIndicator"></div>
+<h1>Marcador Pàdel/Tennis</h1>
 
 <div class="container">
   <div class="team blue-team">
     <div class="players">
-      <input id="bluePlayer1" value="Jugador 1">
-      <input id="bluePlayer2" value="Jugador 2">
+      <div class="player"><span id="serveBlue1" class="serve-icon"></span><input id="bluePlayer1" value="Jugador 1"></div>
+      <div class="player"><span id="serveBlue2" class="serve-icon"></span><input id="bluePlayer2" value="Jugador 2"></div>
     </div>
     <div id="blueScore" class="score" style="color:#0066ff">0</div>
-    <div id="blueGames" class="games">0</div>
-    <div id="blueSets" class="sets">0</div>
+    <div id="blueGames" class="games">Jocs: 0</div>
+    <div id="blueSets" class="sets">Sets: 0</div>
     <div class="controls">
       <button class="blue-btn" onclick="addPoint('blue')">+ Azul</button>
     </div>
@@ -44,12 +44,12 @@
 
   <div class="team red-team">
     <div class="players">
-      <input id="redPlayer1" value="Jugador 3">
-      <input id="redPlayer2" value="Jugador 4">
+      <div class="player"><span id="serveRed1" class="serve-icon"></span><input id="redPlayer1" value="Jugador 3"></div>
+      <div class="player"><span id="serveRed2" class="serve-icon"></span><input id="redPlayer2" value="Jugador 4"></div>
     </div>
     <div id="redScore" class="score" style="color:#ff0000">0</div>
-    <div id="redGames" class="games">0</div>
-    <div id="redSets" class="sets">0</div>
+    <div id="redGames" class="games">Jocs: 0</div>
+    <div id="redSets" class="sets">Sets: 0</div>
     <div class="controls">
       <button class="red-btn" onclick="addPoint('red')">+ Rojo</button>
     </div>
@@ -57,81 +57,101 @@
 </div>
 
 <div class="controls">
-  <button onclick="undoLast()">↩ Deshacer</button>
+  <button onclick="undoLast()">↩ Desfer</button>
   <button onclick="resetMatch()">⟳ Reiniciar</button>
-  <button onclick="toggleMic()">🎤 Micrófono</button>
+  <button onclick="toggleServerOrder()">🔄 Canviar ordre servei</button>
+  <button onclick="randomTeams()">🎲 Equips aleatoris</button>
 </div>
 
 <script>
+let pointSequence = [0,15,30,40,'AD'];
 let scores={blue:0,red:0}, games={blue:0,red:0}, sets={blue:0,red:0}, history=[];
-let listening=false;
+let currentServer = 'blue1';
+let serverOrder = ['blue1','blue2','red1','red2'];
+let serverIndex = 0;
+
+function getDisplayScore(team){
+  let opp = (team==='blue')?'red':'blue';
+  if(scores[team]<=3 && scores[opp]<=3 && !(scores[team]==3 && scores[opp]==3)){
+    return pointSequence[scores[team]];
+  }
+  if(scores[team]>=3 && scores[opp]>=3){
+    if(scores[team]==scores[opp]) return '40';
+    if(scores[team]==scores[opp]+1) return 'AD';
+    if(scores[opp]==scores[team]+1) return '40';
+  }
+  return pointSequence[Math.min(scores[team],4)];
+}
 
 function updateDisplay(){
-  document.getElementById("blueScore").innerText=scores.blue;
-  document.getElementById("redScore").innerText=scores.red;
-  document.getElementById("blueGames").innerText=games.blue;
-  document.getElementById("redGames").innerText=games.red;
-  document.getElementById("blueSets").innerText=sets.blue;
-  document.getElementById("redSets").innerText=sets.red;
+  document.getElementById("blueScore").innerText=getDisplayScore('blue');
+  document.getElementById("redScore").innerText=getDisplayScore('red');
+  document.getElementById("blueGames").innerText="Jocs: "+games.blue;
+  document.getElementById("redGames").innerText="Jocs: "+games.red;
+  document.getElementById("blueSets").innerText="Sets: "+sets.blue;
+  document.getElementById("redSets").innerText="Sets: "+sets.red;
+  document.querySelectorAll('.serve-icon').forEach(e=>e.innerText='');
+  document.getElementById('serve'+currentServer.charAt(0).toUpperCase()+currentServer.slice(1)).innerText='🎾';
 }
 
 function addPoint(team){
-  history.push({scores:{...scores},games:{...games},sets:{...sets}});
+  history.push({scores:{...scores},games:{...games},sets:{...sets},serverIndex});
+  let opp=(team==='blue')?'red':'blue';
   scores[team]++;
+  if(checkGameWin(team,opp)){
+    scores.blue=0;scores.red=0;
+    games[team]++;
+    nextServer();
+  }
   updateDisplay();
+}
+
+function checkGameWin(team,opp){
+  return (scores[team]>=4 && scores[team]>=scores[opp]+2);
+}
+
+function nextServer(){
+  serverIndex=(serverIndex+1)%serverOrder.length;
+  currentServer=serverOrder[serverIndex];
 }
 
 function undoLast(){
   if(history.length>0){
     let prev=history.pop();
-    scores=prev.scores; games=prev.games; sets=prev.sets;
+    scores=prev.scores; games=prev.games; sets=prev.sets; serverIndex=prev.serverIndex;
+    currentServer=serverOrder[serverIndex];
     updateDisplay();
   }
 }
 
 function resetMatch(){
-  if(!confirm("¿Reiniciar partido?")) return;
+  if(!confirm("Reiniciar partit?")) return;
   scores={blue:0,red:0}; games={blue:0,red:0}; sets={blue:0,red:0}; history=[];
+  currentServer='blue1'; serverIndex=0;
   updateDisplay();
 }
 
-// ---- Reconocimiento de voz ----
-const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-let recognition=null;
-
-if(SpeechRecognition){
-  recognition=new SpeechRecognition();
-  recognition.lang="es-ES";
-  recognition.continuous=false; 
-  recognition.interimResults=false;
-
-  recognition.onresult=(event)=>{
-    const transcript=event.results[0][0].transcript.toLowerCase();
-    console.log("Reconocido:",transcript);
-    if(transcript.includes("azul")) addPoint("blue");
-    if(transcript.includes("rojo")) addPoint("red");
-    if(transcript.includes("cancelar")) undoLast();
-  };
-
-  recognition.onerror=(e)=>console.error("SpeechRecognition error:",e.error);
-
-  recognition.onend=()=>{ if(listening) recognition.start(); };
+function toggleServerOrder(){
+  serverOrder.reverse();
+  alert("Ordre de servei canviat!");
 }
 
-function toggleMic(){
-  if(!recognition){ alert("Reconocimiento no disponible."); return; }
-  if(listening){
-    recognition.stop(); listening=false;
-    document.getElementById("listenIndicator").style.display="none";
-  }else{
-    recognition.start(); listening=true;
-    document.getElementById("listenIndicator").style.display="block";
-  }
+function randomTeams(){
+  let players=[
+    document.getElementById('bluePlayer1').value,
+    document.getElementById('bluePlayer2').value,
+    document.getElementById('redPlayer1').value,
+    document.getElementById('redPlayer2').value
+  ];
+  players.sort(()=>Math.random()-0.5);
+  document.getElementById('bluePlayer1').value=players[0];
+  document.getElementById('bluePlayer2').value=players[1];
+  document.getElementById('redPlayer1').value=players[2];
+  document.getElementById('redPlayer2').value=players[3];
 }
 
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("service-worker.js")
-    .then(() => console.log("Service Worker registrat!"));
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("service-worker.js").then(()=>console.log("Service Worker registrat!"));
 }
 
 updateDisplay();

@@ -1,440 +1,86 @@
-// Marcador Pàdel PWA amb veu i funcionalitats extres
-// Desenvolupat per funcionar íntegrament offline un cop instal·lat (HTTPS requerit per veu)
-
-// ---- PWA ----
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js');
-  });
-}
-
-// ---- Audio (WebAudio) ----
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-let soundOn = true;
-function beep(duration=250, type='sine', frequency=880, volume=0.2){
-  if(!soundOn) return;
-  const o = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-  o.type = type;
-  o.frequency.value = frequency;
-  g.gain.setValueAtTime(volume, audioCtx.currentTime);
-  o.connect(g); g.connect(audioCtx.destination);
-  o.start();
-  o.stop(audioCtx.currentTime + duration/1000);
-}
-function longTone(duration=3000, frequency=520){
-  if(!soundOn) return;
-  const o = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-  o.type='triangle'; o.frequency.value = frequency;
-  g.gain.setValueAtTime(0.12, audioCtx.currentTime);
-  o.connect(g); g.connect(audioCtx.destination);
-  o.start();
-  o.stop(audioCtx.currentTime + duration/1000);
-}
-
-// ---- UI Elements ----
-const els = {
-  scoreBlue: document.getElementById('scoreBlue'),
-  scoreRed: document.getElementById('scoreRed'),
-  gamesBlue: document.getElementById('gamesBlue'),
-  gamesRed: document.getElementById('gamesRed'),
-  setsBlue: document.getElementById('setsBlue'),
-  setsRed: document.getElementById('setsRed'),
-  gamesBlue2: document.getElementById('gamesBlue2'),
-  gamesRed2: document.getElementById('gamesRed2'),
-  setsBlue2: document.getElementById('setsBlue2'),
-  setsRed2: document.getElementById('setsRed2'),
-  addBlue: document.getElementById('addBlue'),
-  addRed: document.getElementById('addRed'),
-  undoPoint: document.getElementById('undoPoint'),
-  resetMatch: document.getElementById('resetMatch'),
-  randomTeams: document.getElementById('randomTeams'),
-  changeOrder: document.getElementById('changeOrder'),
-  randomServe: document.getElementById('randomServe'),
-  micToggle: document.getElementById('micToggle'),
-  micStatus: document.getElementById('micStatus'),
-  soundToggle: document.getElementById('soundToggle'),
-  soundStatus: document.getElementById('soundStatus'),
-  blueP1: document.getElementById('blueP1'),
-  blueP2: document.getElementById('blueP2'),
-  redP1: document.getElementById('redP1'),
-  redP2: document.getElementById('redP2'),
-  blueP1Row: document.getElementById('blueP1Row'),
-  blueP2Row: document.getElementById('blueP2Row'),
-  redP1Row: document.getElementById('redP1Row'),
-  redP2Row: document.getElementById('redP2Row'),
-  blueP1Order: document.getElementById('blueP1Order'),
-  blueP2Order: document.getElementById('blueP2Order'),
-  redP1Order: document.getElementById('redP1Order'),
-  redP2Order: document.getElementById('redP2Order'),
-  orderModal: document.getElementById('orderModal'),
-  sortableList: document.getElementById('sortableList'),
-  saveOrder: document.getElementById('saveOrder'),
-  cancelOrder: document.getElementById('cancelOrder'),
-  historyList: document.getElementById('historyList'),
+// PWA Scoreboard with voice
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("./service-worker.js"); }
+const $ = sel => document.querySelector(sel);
+const blueScoreEl = $("#blue-score");
+const redScoreEl = $("#red-score");
+const gamesEl = $("#games");
+const setsEl = $("#sets");
+const modeEl = $("#mode");
+const tbIndicator = $("#tbIndicator");
+const historySetsEl = $("#history-sets");
+const micDot = $("#mic-dot");
+const micLabel = $("#mic-label");
+const soundDot = $("#sound-dot");
+const soundLabel = $("#sound-label");
+const serveBlue = $("#serve-blue");
+const serveRed = $("#serve-red");
+const inputs = { blue1: $("#blue-p1"), blue2: $("#blue-p2"), red1: $("#red-p1"), red2: $("#red-p2") };
+const orderEls = { blue1: $("#blue-p1-order"), blue2: $("#blue-p2-order"), red1: $("#red-p1-order"), red2: $("#red-p2-order") };
+const state = {
+  points:{blue:0,red:0}, tiebreak:false, tbPoints:{blue:0,red:0},
+  games:{blue:0,red:0}, sets:{blue:0,red:0}, history:[[]],
+  servingOrder:["blue1","red1","blue2","red2"], serverIndex:0,
+  micEnabled:false, soundEnabled:true, cooldown:false, undoCooldown:false, lastEvents:[]
 };
-
-// ---- State ----
-const POINTS = ['0','15','30','40','ADV'];
-function createInitialState(){
-  return {
-    cur: { blue:0, red:0, adv: null }, // adv: 'blue'/'red'/null
-    games: { blue:0, red:0 },
-    sets:  { blue:0, red:0 },
-    history: [], // [{blue:6, red:4}]
-    // players
-    players: {
-      blue: [ {name:els.blueP1.value}, {name:els.blueP2.value} ],
-      red:  [ {name:els.redP1.value},  {name:els.redP2.value}  ],
-    },
-    // serve order indexes into [B1,R1,B2,R2] by default
-    order: ['B1','R1','B2','R2'],
-    serverIndex: 0,
-    lastAction: null, // {type:'point', winner:'blue'|'red', snapshot:{}}
-    cooldownUntil: 0
-  };
+const POINTS_VIEW = ["0","15","30","40","Adv"];
+function saveLocal(){ localStorage.setItem("marcador-padel", JSON.stringify({state, players:Object.fromEntries(Object.entries(inputs).map(([k,el])=>[k,el.value]))})); }
+function loadLocal(){ try{ const data=JSON.parse(localStorage.getItem("marcador-padel")); if(!data)return; Object.assign(state, data.state||{}); if(data.players){ Object.entries(data.players).forEach(([k,v])=>inputs[k]&&(inputs[k].value=v)); } }catch{} }
+loadLocal();
+function currentSetScoreAtIndex(idx){ if(idx<state.history.length-1){ const finished=state.history[idx]; if(finished.length) return finished[finished.length-1]; return [0,0]; } else { return [state.games.blue, state.games.red]; } }
+function updateUI(){
+  if(state.tiebreak){ blueScoreEl.textContent=state.tbPoints.blue; redScoreEl.textContent=state.tbPoints.red; modeEl.textContent="Tie-break"; tbIndicator.classList.remove("hidden"); }
+  else { blueScoreEl.textContent=POINTS_VIEW[state.points.blue]||"0"; redScoreEl.textContent=POINTS_VIEW[state.points.red]||"0"; modeEl.textContent="Joc"; tbIndicator.classList.add("hidden"); }
+  gamesEl.textContent=`${state.games.blue} — ${state.games.red}`;
+  setsEl.textContent=`${state.sets.blue} — ${state.sets.red}`;
+  const currentServerKey = state.servingOrder[state.serverIndex % 4];
+  serveBlue.innerHTML=""; serveRed.innerHTML="";
+  const racket = `<svg class="racket" viewBox="0 0 24 24" fill="currentColor"><path d="M14.5 2a6.5 6.5 0 0 0-6.2 8.4L3 16.8a2.5 2.5 0 0 0 3.5 3.5l6.4-5.3A6.5 6.5 0 1 0 14.5 2Zm0 2a4.5 4.5 0 1 1-3.2 7.7A4.5 4.5 0 0 1 14.5 4Z"/></svg>`;
+  if(currentServerKey.startsWith("blue")) serveBlue.innerHTML=racket; else serveRed.innerHTML=racket;
+  state.servingOrder.forEach((key,i)=>{ if(orderEls[key]) orderEls[key].textContent=(i+1); });
+  historySetsEl.innerHTML=""; state.history.forEach((setArr,i)=>{ const [b,r]=currentSetScoreAtIndex(i); const chip=document.createElement("div"); chip.className="chip"; chip.textContent=`Set ${i+1}: ${b} - ${r}`; historySetsEl.appendChild(chip); });
+  micDot.classList.toggle("on", state.micEnabled); micDot.classList.toggle("off", !state.micEnabled); micLabel.textContent=state.micEnabled?"Actiu":"Inactiu";
+  soundDot.classList.toggle("on", state.soundEnabled); soundDot.classList.toggle("off", !state.soundEnabled); soundLabel.textContent=state.soundEnabled?"Actiu":"Inactiu";
+  saveLocal();
 }
-let S = createInitialState();
-
-function now(){ return Date.now(); }
-function inCooldown(){ return now() < S.cooldownUntil; }
-function setCooldown(ms=3000){ S.cooldownUntil = now() + ms; }
-
-// ---- Rendering ----
-function render(){
-  // score
-  const scoreTextBlue = scoreText('blue');
-  const scoreTextRed  = scoreText('red');
-  els.scoreBlue.textContent = scoreTextBlue;
-  els.scoreRed.textContent  = scoreTextRed;
-
-  // games/sets mirroring (both panels show both)
-  els.gamesBlue.textContent = S.games.blue;
-  els.gamesBlue2.textContent= S.games.blue;
-  els.gamesRed.textContent  = S.games.red;
-  els.gamesRed2.textContent = S.games.red;
-  els.setsBlue.textContent  = S.sets.blue;
-  els.setsBlue2.textContent = S.sets.blue;
-  els.setsRed.textContent   = S.sets.red;
-  els.setsRed2.textContent  = S.sets.red;
-
-  // server highlight
-  const ids = mapOrderToPlayers();
-  const allRows = [els.blueP1Row, els.redP1Row, els.blueP2Row, els.redP2Row];
-  allRows.forEach(r => r.classList.remove('server'));
-  const current = ids[S.serverIndex];
-  const row = {
-    'B1': els.blueP1Row, 'B2': els.blueP2Row, 'R1': els.redP1Row, 'R2': els.redP2Row
-  }[current];
-  if(row) row.classList.add('server');
-
-  // orders
-  const orderMap = { 'B1': null, 'R1': null, 'B2': null, 'R2': null };
-  S.order.forEach((k,i)=>{ orderMap[k]= (i+1); });
-  els.blueP1Order.textContent = orderMap['B1'];
-  els.blueP2Order.textContent = orderMap['B2'];
-  els.redP1Order.textContent  = orderMap['R1'];
-  els.redP2Order.textContent  = orderMap['R2'];
-
-  // history
-  els.historyList.innerHTML = S.history.map((set,i)=>{
-    return `<div class="row"><div>Set ${i+1}</div><div><span class="pill blue">B</span> ${set.blue} - ${set.red} <span class="pill red">R</span></div></div>`;
-  }).join('');
-}
-
-function scoreText(team){
-  const b = S.cur.blue, r = S.cur.red;
-  if(b>=3 && r>=3){
-    if(b===r) return '40'; // deuce
-    if((team==='blue' && S.cur.adv==='blue') || (team==='red' && S.cur.adv==='red')) return 'ADV';
-    return '40';
-  }
-  const val = team==='blue'? b : r;
-  return POINTS[Math.min(val,3)];
-}
-
-function mapOrderToPlayers(){
-  return S.order.slice(); // ['B1','R1','B2','R2']
-}
-
-function nextServer(){
-  S.serverIndex = (S.serverIndex + 1) % 4;
-}
-
-// ---- Scoring Logic ----
-function pointWon(winner){
-  if(inCooldown()) return;
-  setCooldown(3000);
-  beep(160, 'sine', 990, 0.25);
-
-  const snapshot = JSON.parse(JSON.stringify(S));
-  S.lastAction = { type:'point', winner, snapshot };
-
-  let b = S.cur.blue;
-  let r = S.cur.red;
-
-  // Deuce/Adv logic
-  if(b>=3 && r>=3){
-    if(S.cur.adv === null){
-      S.cur.adv = winner;
-    } else if(S.cur.adv === winner){
-      // wins game
-      gameWon(winner);
-      return render();
-    } else {
-      // back to deuce
-      S.cur.adv = null;
-    }
-  } else {
-    // Normal progression
-    if(winner==='blue') b++;
-    else r++;
-
-    S.cur.blue = b;
-    S.cur.red = r;
-
-    if(b>=4 || r>=4){
-      const diff = Math.abs(b - r);
-      if((b>=4 || r>=4) && diff>=2){
-        gameWon(b>r?'blue':'red');
-        return render();
-      }
-    }
-  }
-  render();
-}
-
-function gameWon(winner){
-  // reset points
-  S.cur = { blue:0, red:0, adv:null };
-  // inc games
-  S.games[winner]++;
-  // rotate server
-  nextServer();
-
-  // check set
-  const gB = S.games.blue, gR = S.games.red;
-  const max = Math.max(gB, gR);
-  const min = Math.min(gB, gR);
-  if((max>=6 && (max-min)>=2) || max===7){
-    // set finished
-    if(gB>gR) S.sets.blue++; else S.sets.red++;
-    S.history.push({blue:gB, red:gR});
-    S.games = {blue:0, red:0};
-  }
-}
-
-// ---- Undo ----
-function undo(){
-  if(inCooldown()) return;
-  if(!S.lastAction) return;
-  setCooldown(3000);
-  beep(220, 'square', 480, 0.25);
-  const snap = S.lastAction.snapshot;
-  S = snap;
-  S.lastAction = null;
-  render();
-}
-
-// ---- Reset ----
-function resetAll(){
-  if(!confirm('Segur que vols reiniciar el partit?')) return;
-  S = createInitialState();
-  render();
-}
-
-// ---- Random Teams ----
-function randomTeams(){
-  // 3s draft animation + 3s tone, then set, then 3s cooldown
-  const names = [
-    els.blueP1.value, els.blueP2.value, els.redP1.value, els.redP2.value
-  ];
-
-  let t = 0;
-  const anim = setInterval(()=>{
-    t++;
-    const shuffled = names.slice().sort(()=>Math.random()-0.5);
-    els.blueP1.value = shuffled[0];
-    els.redP1.value  = shuffled[1];
-    els.blueP2.value = shuffled[2];
-    els.redP2.value  = shuffled[3];
-  }, 120);
-
-  longTone(3000, 520);
-  setTimeout(()=>{
-    clearInterval(anim);
-    setCooldown(3000);
-    // re-bind players into state
-    S.players.blue[0].name = els.blueP1.value;
-    S.players.blue[1].name = els.blueP2.value;
-    S.players.red[0].name  = els.redP1.value;
-    S.players.red[1].name  = els.redP2.value;
-    render();
-  }, 3000);
-}
-
-// ---- Change Serve Order (Drag & Drop) ----
-function openOrderModal(){
-  els.sortableList.innerHTML = '';
-  const items = [
-    {id:'B1', label: els.blueP1.value, color:'var(--blue)'},
-    {id:'R1', label: els.redP1.value,  color:'var(--red)'},
-    {id:'B2', label: els.blueP2.value, color:'var(--blue)'},
-    {id:'R2', label: els.redP2.value,  color:'var(--red)'}
-  ];
-  items.forEach((it,i)=>{
-    const div = document.createElement('div');
-    div.className='sort-item';
-    div.draggable = true;
-    div.dataset.id = it.id;
-    div.innerHTML = `<div style="display:flex;align-items:center;gap:10px">
-      <span class="color" style="background:${it.color}"></span>
-      <strong>${it.label}</strong>
-    </div>
-    <span class="badge">#${i+1}</span>`;
-    addDnD(div);
-    els.sortableList.appendChild(div);
-  });
-  els.orderModal.style.display='flex';
-}
-function closeOrderModal(){ els.orderModal.style.display='none'; }
-
-function addDnD(el){
-  el.addEventListener('dragstart', e => {
-    e.dataTransfer.setData('text/plain', el.dataset.id);
-    el.style.opacity='.6';
-  });
-  el.addEventListener('dragend', e => el.style.opacity='1');
-  el.addEventListener('dragover', e => e.preventDefault());
-  el.addEventListener('drop', e => {
-    e.preventDefault();
-    const fromId = e.dataTransfer.getData('text/plain');
-    const fromEl = [...els.sortableList.children].find(c=>c.dataset.id===fromId);
-    if(fromEl && fromEl!==el){
-      const children = [...els.sortableList.children];
-      const toIndex = children.indexOf(el);
-      els.sortableList.insertBefore(fromEl, children[toIndex]);
-      updateBadges();
-    }
-  });
-}
-
-function updateBadges(){
-  [...els.sortableList.children].forEach((c,i)=>{
-    c.querySelector('.badge').textContent = `#${i+1}`;
-  });
-}
-
-// ---- Random Serve (coin toss) ----
-function randomServe(){
-  const coin = Math.random() < 0.5 ? 'blue' : 'red';
-  alert(`Comença servint l'equip ${coin==='blue'?'BLAU':'VERMELL'}.`);
-  // set serverIndex to the first occurrence of chosen team in order
-  const firstIdx = S.order.findIndex(k => coin==='blue'? k.startsWith('B'): k.startsWith('R'));
-  if(firstIdx>=0) S.serverIndex = firstIdx;
-  render();
-}
-
-// ---- Voice Recognition ----
-let recognition = null;
-let micOn = false;
-
-function initSpeech(){
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){
-    alert('El navegador no suporta SpeechRecognition.');
-    return;
-  }
-  recognition = new SR();
-  recognition.lang = 'es-ES'; // we'll parse ES/CA words; engine language can be ES
-  recognition.continuous = true;
-  recognition.interimResults = false;
-
-  recognition.onresult = (event) => {
-    for(let i=event.resultIndex; i<event.results.length; i++){
-      if(event.results[i].isFinal){
-        const said = event.results[i][0].transcript.trim().toLowerCase();
-        handleVoice(said);
-      }
-    }
-  };
-  recognition.onend = () => {
-    if(micOn){ // keep listening while mic is ON
-      try { recognition.start(); } catch(e){}
-    }
-  };
-}
-
-function handleVoice(text){
-  // Commands (ES): "equipo rojo" / "equipo azul" / "cancelar punto"
-  // Commands (CA): "equip vermell" / "equip blau" / "cancelar punt"
-  const t = text.normalize('NFD').replace(/[\u0300-\u036f]/g,''); // strip accents
-  if(/equipo\s+rojo|equip\s+vermell/.test(t)){
-    pointWon('red');
-  } else if(/equipo\s+azul|equip\s+blau/.test(t)){
-    pointWon('blue');
-  } else if(/cancelar\s+punto|cancelar\s+punt/.test(t)){
-    undo();
-  }
-}
-
-function toggleMic(){
-  if(!recognition) initSpeech();
-  if(!recognition) return;
-
-  micOn = !micOn;
-  els.micStatus.textContent = micOn ? 'ON' : 'OFF';
-  els.micToggle.setAttribute('aria-pressed', micOn?'true':'false');
-  if(micOn){
-    navigator.mediaDevices.getUserMedia({audio:true})
-      .then(() => { try{ recognition.start(); }catch(e){} })
-      .catch(()=>{
-        micOn=false;
-        els.micStatus.textContent='OFF';
-        alert('No s\'ha pogut accedir al micròfon.');
-      });
-  } else {
-    try{ recognition.stop(); }catch(e){}
-  }
-}
-
-// ---- Bindings ----
-els.addBlue.addEventListener('click', ()=>pointWon('blue'));
-els.addRed.addEventListener('click', ()=>pointWon('red'));
-els.undoPoint.addEventListener('click', undo);
-els.resetMatch.addEventListener('click', resetAll);
-els.randomTeams.addEventListener('click', randomTeams);
-els.changeOrder.addEventListener('click', openOrderModal);
-els.randomServe.addEventListener('click', randomServe);
-els.micToggle.addEventListener('click', toggleMic);
-els.soundToggle.addEventListener('click', ()=>{
-  soundOn = !soundOn;
-  els.soundStatus.textContent = soundOn ? 'ON' : 'OFF';
-});
-
-els.saveOrder.addEventListener('click', ()=>{
-  // read back order from DOM
-  const ids = [...els.sortableList.children].map(c=>c.dataset.id);
-  if(!confirm('Desar el nou ordre de servei?')) return;
-  S.order = ids;
-  // reset to first server of that new order
-  S.serverIndex = 0;
-  closeOrderModal();
-  render();
-});
-
-els.cancelOrder.addEventListener('click', closeOrderModal);
-
-// Player name changes -> reflect in state
-[els.blueP1, els.blueP2, els.redP1, els.redP2].forEach((inp, idx)=>{
-  inp.addEventListener('change', ()=>{
-    if(idx===0) S.players.blue[0].name = inp.value;
-    if(idx===1) S.players.blue[1].name = inp.value;
-    if(idx===2) S.players.red[0].name  = inp.value;
-    if(idx===3) S.players.red[1].name  = inp.value;
-  });
-});
-
-// ---- Init ----
-render();
+function playBeep(duration=300,type="sine",freq=660){ if(!state.soundEnabled)return; const ctx=new (window.AudioContext||window.webkitAudioContext)(); const o=ctx.createOscillator(); const g=ctx.createGain(); o.type=type; o.frequency.setValueAtTime(freq, ctx.currentTime); o.connect(g); g.connect(ctx.destination); g.gain.setValueAtTime(0.001, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime+0.01); o.start(); setTimeout(()=>{ g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.03); o.stop(); ctx.close&&ctx.close(); }, duration); }
+function threeSecondDraftSound(){ if(!state.soundEnabled) return; const ctx=new (window.AudioContext||window.webkitAudioContext)(); const o=ctx.createOscillator(); const g=ctx.createGain(); o.type="sawtooth"; o.frequency.setValueAtTime(220, ctx.currentTime); o.connect(g); g.connect(ctx.destination); g.gain.setValueAtTime(0.05, ctx.currentTime); o.start(); setTimeout(()=>{ o.stop(); ctx.close&&ctx.close(); }, 3000); }
+function cooldown(ms=3000){ state.cooldown=true; setTimeout(()=>state.cooldown=false, ms); }
+function undoCooldown(ms=3000){ state.undoCooldown=true; setTimeout(()=>state.undoCooldown=false, ms); }
+function addPoint(team){ if(state.cooldown) return; state.lastEvents.push(JSON.stringify(state)); if(state.tiebreak){ state.tbPoints[team]++; playBeep(120,"triangle",720); checkTiebreakComplete(); } else { const opp=team==="blue"?"red":"blue"; const p=state.points; if(p[team]<=2){ p[team]++; } else if(p[team]===3){ if(p[opp]<3){ winGame(team); } else if(p[opp]===3){ p[team]=4; } else if(p[opp]===4){ p[opp]=3; } } else if(p[team]===4){ winGame(team); } playBeep(120,"triangle",720); cooldown(); } updateUI(); }
+function undoPoint(){ if(state.undoCooldown) return; const last=state.lastEvents.pop(); if(last){ Object.assign(state, JSON.parse(last)); playBeep(200,"square",440); undoCooldown(); updateUI(); } }
+function resetGamePoints(){ state.points.blue=0; state.points.red=0; }
+function nextServer(){ state.serverIndex=(state.serverIndex+1)%4; }
+function winGame(team){ state.games[team]++; resetGamePoints(); nextServer(); if(isSetComplete()){ completeSet(); } else if(state.games.blue===6 && state.games.red===6){ state.tiebreak=true; state.tbPoints.blue=0; state.tbPoints.red=0; } }
+function isSetComplete(){ const b=state.games.blue, r=state.games.red; if(b>=6 || r>=6){ if(Math.abs(b-r)>=2) return true; } return false; }
+function checkTiebreakComplete(){ const b=state.tbPoints.blue, r=state.tbPoints.red; const lead=Math.abs(b-r); const winner=(b>=7 && lead>=2) ? "blue" : (r>=7 && lead>=2) ? "red" : null; if(winner){ state.games[winner]++; completeSet(true); } }
+function completeSet(fromTiebreak=false){ const setScore=[state.games.blue, state.games.red]; state.history[state.history.length-1]=[setScore]; if(state.games.blue>state.games.red) state.sets.blue++; else state.sets.red++; state.games.blue=0; state.games.red=0; resetGamePoints(); state.tiebreak=false; state.tbPoints.blue=0; state.tbPoints.red=0; state.history.push([]); }
+function randomTeams(){ const names=[inputs.blue1.value, inputs.blue2.value, inputs.red1.value, inputs.red2.value]; threeSecondDraftSound(); const shuffle=[...names].sort(()=>Math.random()-0.5); setTimeout(()=>{ inputs.blue1.value=shuffle[0]; inputs.blue2.value=shuffle[1]; inputs.red1.value=shuffle[2]; inputs.red2.value=shuffle[3]; playBeep(200,"square",520); cooldown(); updateUI(); }, 3000); }
+function randomServe(){ state.serverIndex=Math.floor(Math.random()*4); playBeep(200,"sine",660); updateUI(); }
+function showServiceModal(show){ $("#modal-service").classList.toggle("hidden", !show); if(show){ const list=$("#service-list"); list.innerHTML=""; state.servingOrder.forEach(key=>{ const item=document.createElement("div"); item.className="draggable "+(key.startsWith("blue")?"blue":"red"); item.draggable=true; item.dataset.key=key; const label=(key=="blue1"?inputs.blue1.value:key=="blue2"?inputs.blue2.value:key=="red1"?inputs.red1.value:inputs.red2.value); item.innerHTML=`<strong>${label}</strong> <span class="order-badge">${key}</span>`; list.appendChild(item); }); enableDragSort(list); } }
+function enableDragSort(container){ let dragEl=null; container.querySelectorAll(".draggable").forEach(el=>{ el.addEventListener("dragstart",(e)=>{ dragEl=el; el.style.opacity="0.6"; }); el.addEventListener("dragend",()=>{ dragEl=null; container.querySelectorAll(".draggable").forEach(x=>x.style.opacity="1"); }); el.addEventListener("dragover",(e)=>{ e.preventDefault(); }); el.addEventListener("drop",(e)=>{ e.preventDefault(); if(!dragEl||dragEl===el) return; container.insertBefore(dragEl, el); }); }); }
+function saveServiceOrderFromModal(){ const list=Array.from($("#service-list").children); const order=list.map(el=>el.dataset.key); const blues=order.filter(k=>k.startsWith("blue")).length; const reds=order.filter(k=>k.startsWith("red")).length; if(blues===2 && reds===2){ state.servingOrder=order; playBeep(150,"sine",700); updateUI(); } else { alert("Han d'haver-hi 2 jugadors blaus i 2 vermells."); } }
+function resetMatch(){ if(!confirm("Reiniciar el partit? Aquesta acció no es pot desfer.")) return; Object.assign(state,{ points:{blue:0,red:0}, tiebreak:false, tbPoints:{blue:0,red:0}, games:{blue:0,red:0}, sets:{blue:0,red:0}, history:[[]], servingOrder:["blue1","red1","blue2","red2"], serverIndex:0, lastEvents:[], cooldown:false, undoCooldown:false }); playBeep(220,"sine",500); updateUI(); }
+$("#btn-blue-point").addEventListener("click", ()=>addPoint("blue"));
+$("#btn-red-point").addEventListener("click", ()=>addPoint("red"));
+$("#btn-undo").addEventListener("click", ()=>undoPoint());
+$("#btn-reset").addEventListener("click", ()=>resetMatch());
+$("#btn-random-teams").addEventListener("click", ()=>randomTeams());
+$("#btn-service-order").addEventListener("click", ()=>showServiceModal(true));
+$("#service-cancel").addEventListener("click", ()=>showServiceModal(false));
+$("#service-save").addEventListener("click", ()=>{ showServiceModal(false); saveServiceOrderFromModal(); });
+$("#btn-random-serve").addEventListener("click", ()=>randomServe());
+$("#btn-mic-toggle").addEventListener("click", ()=>{ state.micEnabled=!state.micEnabled; if(state.micEnabled) startRecognition(true); else stopRecognition(); updateUI(); });
+$("#btn-sound-toggle").addEventListener("click", ()=>{ state.soundEnabled=!state.soundEnabled; updateUI(); });
+Object.values(inputs).forEach(el=>el.addEventListener("input", ()=>updateUI()));
+$("#btn-enable-mic").addEventListener("click", ()=>{ startRecognition(true); });
+let recognition=null; let listening=false;
+function startRecognition(explicit=false){ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR){ alert("El navegador no suporta reconeixement de veu."); return; } recognition=recognition||new SR(); recognition.lang="es-ES"; recognition.continuous=true; recognition.interimResults=false; recognition.onresult=(e)=>{ const last=e.results[e.results.length-1][0].transcript.trim().toLowerCase(); handleVoice(last); }; recognition.onstart=()=>{ listening=true; state.micEnabled=true; updateUI(); }; recognition.onend=()=>{ listening=false; state.micEnabled=false; updateUI(); }; try{ recognition.start(); }catch(err){} if(explicit){ playBeep(120,"sine",800); micLabel.textContent="Actiu"; micDot.classList.remove("off"); micDot.classList.add("on"); } }
+function stopRecognition(){ if(recognition){ recognition.stop(); } }
+const VOICE_CMDS=[
+  {phrases:["equipo azul","equip blau"], action:()=>addPoint("blue")},
+  {phrases:["equipo rojo","equip vermell"], action:()=>addPoint("red")},
+  {phrases:["cancelar punto","cancelar punt"], action:()=>undoPoint()},
+];
+function handleVoice(text){ const found=VOICE_CMDS.find(cmd=>cmd.phrases.some(p=> text.includes(p))); if(found) found.action(); }
+function isSetComplete(){ const b=state.games.blue, r=state.games.red; if(b>=6 || r>=6){ if(Math.abs(b-r)>=2) return true; } return false; }
+updateUI();

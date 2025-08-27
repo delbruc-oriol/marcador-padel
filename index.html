@@ -1,142 +1,312 @@
-
-<!DOCTYPE html>
-<html lang="ca">
+﻿<!DOCTYPE html>
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Marcador Pàdel</title>
-  <link rel="manifest" href="manifest.json">
+  <title>Marcador de Padel por Voz</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 0;
-      padding: 0;
-      background: #fff;
-    }
-    header {
-      font-size: 28px;
-      margin: 10px;
-    }
-    .marcador {
-      display: grid;
-      grid-template-columns: 1fr 200px 1fr;
-      gap: 10px;
-      align-items: center;
-      justify-items: center;
-      margin-top: 10px;
-    }
-    .jugadors {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      font-size: 20px;
-    }
-    .jugador {
-      display: flex;
-      align-items: center;
-      margin: 5px 0;
-    }
-    .jugador span {
-      min-width: 90px;
-    }
-    .servei {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: yellow;
-      margin-right: 6px;
-      display: none;
-    }
-    .sets {
-      display: flex;
-      gap: 20px;
-      margin-left: 10px;
-      margin-right: 10px;
-    }
-    .set-num {
-      font-size: 28px;
-      font-weight: bold;
-    }
-    .blau { color: blue; }
-    .vermell { color: red; }
-    .punts {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .punt-gran {
-      font-size: 64px;
-      font-weight: bold;
-      color: white;
-      padding: 20px;
-      margin: 10px 0;
-      border-radius: 8px;
-      min-width: 140px;
-    }
-    .punt-blau { background: blue; }
-    .punt-vermell { background: red; }
-    .botopunt {
-      font-size: 18px;
-      padding: 8px 14px;
-      margin: 4px 0;
-      border: none;
-      cursor: pointer;
-      border-radius: 4px;
-    }
-    .boto-blau { background: #2196F3; color: white; }
-    .boto-vermell { background: #F44336; color: white; }
-    footer {
-      margin-top: 20px;
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    footer button {
-      padding: 10px;
-      border: 1px solid #555;
-      background: #eee;
-      cursor: pointer;
-      min-width: 130px;
-    }
+    body { font-family: Arial, sans-serif; text-align: center; background: #f4f4f4; margin: 0; padding: 0; user-select: none; }
+    h1 { margin: 10px; }
+    .container { display: flex; justify-content: space-around; align-items: flex-start; padding: 20px; gap: 20px; }
+    .team { flex: 1; padding: 20px; border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+    .blue-team { background: #0066ff22; }
+    .red-team { background: #ff000022; }
+    .players { font-size: 1.5em; margin-bottom: 15px; }
+    .blue-team .players { color: #0066ff; }
+    .red-team .players { color: #ff0000; }
+    input { font-size: 1em; text-align: center; border: none; background: transparent; border-bottom: 1px solid #ccc; margin: 5px 0; }
+    .score { font-size: 8vw; font-weight: bold; margin: 20px 0; }
+    .labelled { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 5px 0; }
+    .labelled span { font-size: 1.2em; font-weight: bold; }
+    .games { font-size: 2.5em; }
+    .sets { font-size: 2em; }
+    .controls button { padding: 15px 25px; margin: 10px; font-size: 1.2em; border-radius: 12px; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: transform 0.2s; }
+    .controls button:hover { transform: scale(1.05); }
+    .blue-btn { background: #0066ff; color: #fff; }
+    .red-btn { background: #ff0000; color: #fff; }
+    .listen-indicator { width: 20px; height: 20px; border-radius: 50%; background: green; margin: 10px auto; animation: blink 1s infinite; display: none; }
+    @keyframes blink { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
+    .flash { animation: flash 1s infinite; }
+    @keyframes flash { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    #history { margin: 20px auto; border-collapse: collapse; width: 70%; font-size: 1.3em; }
+    #history th, #history td { border: 1px solid #888; padding: 10px; }
+    #history th { background: #ddd; }
   </style>
 </head>
 <body>
-  <header>Marcador Pàdel <small>by Oriol Espinach</small></header>
-
-  <div class="marcador">
-    <!-- Jugadors blau -->
-    <div class="jugadors blau">
-      <div class="jugador"><div class="servei" id="servei1"></div><span id="j1">Jugador 1</span><div class="sets" id="setsJ1"></div></div>
-      <div class="jugador"><div class="servei" id="servei2"></div><span id="j2">Jugador 2</span><div class="sets" id="setsJ2"></div></div>
+  <h1>PuntdeBreak Marcador</h1>
+  <div class="listen-indicator" id="listenIndicator"></div>
+  <div class="container">
+    <!-- Equipo Azul -->
+    <div class="team blue-team">
+      <div class="players">
+        <input id="bluePlayer1" value="Jugador 1" oninput="updateHeaders()"><br>
+        <input id="bluePlayer2" value="Jugador 2" oninput="updateHeaders()">
+      </div>
+      <div id="blueScore" class="score" style="color:#0066ff">0</div>
+      <div class="labelled"><span>Jocs</span><div id="blueGames" class="games">0</div></div>
+      <div class="labelled"><span>Sets</span><div id="blueSets" class="sets">0</div></div>
+      <div class="controls">
+        <button class="blue-btn" onclick="addPoint('blue')">+ Punto Azul</button>
+      </div>
     </div>
 
-    <!-- Punts centrals -->
-    <div class="punts">
-      <button class="botopunt boto-blau" onclick="anotarPunt('blau')">+ Punto azul</button>
-      <div id="puntBlau" class="punt-gran punt-blau">0</div>
-      <div id="puntVermell" class="punt-gran punt-vermell">0</div>
-      <button class="botopunt boto-vermell" onclick="anotarPunt('vermell')">+ Punto rojo</button>
-    </div>
 
-    <!-- Jugadors vermell -->
-    <div class="jugadors vermell">
-      <div class="jugador"><div class="sets" id="setsJ3"></div><span id="j3">Jugador 3</span><div class="servei" id="servei3"></div></div>
-      <div class="jugador"><div class="sets" id="setsJ4"></div><span id="j4">Jugador 4</span><div class="servei" id="servei4"></div></div>
+    <!-- Equipo Rojo -->
+    <div class="team red-team">
+      <div class="players">
+        <input id="redPlayer1" value="Jugador 3" oninput="updateHeaders()"><br>
+        <input id="redPlayer2" value="Jugador 4" oninput="updateHeaders()">
+      </div>
+      <div id="redScore" class="score" style="color:#ff0000">0</div>
+      <div class="labelled"><span>Jocs</span><div id="redGames" class="games">0</div></div>
+      <div class="labelled"><span>Sets</span><div id="redSets" class="sets">0</div></div>
+      <div class="controls">
+        <button class="red-btn" onclick="addPoint('red')">+ Punto Rojo</button>
+      </div>
     </div>
   </div>
 
-  <footer>
-    <button onclick="reiniciar()">Reiniciar partido</button>
-    <button onclick="cancelarUltimo()">Cancelar último punto</button>
-    <button onclick="toggleSonido()">Sonido</button>
-    <button onclick="toggleMicrofono()">Activar micrófono</button>
-    <button onclick="ordenServicio()">Orden servicio</button>
-    <button onclick="equiposAleatorios()">Equipo aleatorio</button>
-    <button onclick="sorteoSaque()">Saque inicial aleatorio</button>
-  </footer>
 
-<script src="app.js"></script>
+  <!-- Histórico de sets -->
+  <h2>Histórico de Sets</h2>
+  <table id="history">
+    <thead>
+      <tr>
+        <th>Set</th>
+        <th id="blueHeader" style="color:#0066ff">Equipo Azul</th>
+        <th id="redHeader" style="color:#ff0000">Equipo Rojo</th>
+      </tr>
+    </thead>
+    <tbody id="historyBody"></tbody>
+  </table>
+
+
+  <div class="controls">
+    <button onclick="undoLast()">↩ Cancelar último punto</button>
+    <button onclick="resetMatch()">⟳ Reiniciar</button>
+    <button id="draftBtn" onclick="draftTeams()">🎲 Sorteig equips</button>
+    <button onclick="toggleSound()">🔊 Sonido</button>
+    <button onclick="toggleMic()">🎤 Activar micrófono</button>
+  </div>
+
+
+  <script>
+    let scores = {blue:0, red:0};
+    let games = {blue:0, red:0};
+    let sets = {blue:0, red:0};
+    let history = [];
+    let setHistory = [];
+    let listening = false;
+    let soundOn = true;
+    let cooldown = false;
+    let tieBreak = false;
+
+
+    const sndBlue = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
+    const sndRed = new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
+    const sndUndo = new Audio("https://actions.google.com/sounds/v1/cartoon/woodpecker_pecking.ogg");
+    const sndDouble = new Audio("https://actions.google.com/sounds/v1/cartoon/slide_whistle_to_drum_hit.ogg");
+
+
+    function updateDisplay(){
+      document.getElementById("blueScore").innerText = tieBreak? scores.blue : translateScore(scores.blue, scores.red);
+      document.getElementById("redScore").innerText = tieBreak? scores.red : translateScore(scores.red, scores.blue);
+      document.getElementById("blueGames").innerText = games.blue;
+      document.getElementById("redGames").innerText = games.red;
+      document.getElementById("blueSets").innerText = sets.blue;
+      document.getElementById("redSets").innerText = sets.red;
+      renderHistory();
+    }
+
+
+    function translateScore(p, opp){
+      if(p===0) return "0";
+      if(p===1) return "15";
+      if(p===2) return "30";
+      if(p===3 && opp===3) return "Oro"; 
+      if(p===3) return "40";
+      return "";
+    }
+
+
+    function addPoint(team){
+      if(cooldown) return;
+      document.getElementById("draftBtn").disabled = true; // desactivar sorteo tras empezar
+      history.push(JSON.stringify({scores:{...scores}, games:{...games}, sets:{...sets}, tieBreak, setHistory:[...setHistory]}));
+      scores[team]++;
+
+
+      if(!tieBreak){
+        if(scores.blue===4 && scores.red===3 || scores.red===4 && scores.blue===3){
+          winGame(team);
+          return;
+        }
+        if(scores[team] >= 4 && scores[team]-scores[opponent(team)] >= 2){
+          winGame(team);
+          return;
+        }
+      } else {
+        if(scores[team]>=7 && scores[team]-scores[opponent(team)]>=2){
+          winGame(team);
+          tieBreak = false;
+          return;
+        }
+      }
+      flash(team);
+      playSound(team==="blue"?sndBlue:sndRed);
+      startCooldown();
+      updateDisplay();
+    }
+
+
+    function opponent(team){ return team==="blue"?"red":"blue"; }
+
+
+    function winGame(team){
+      games[team]++;
+      scores={blue:0,red:0};
+      if(games[team]>=6 && games[team]-games[opponent(team)]>=2){
+        sets[team]++;
+        setHistory.push({blue:games.blue, red:games.red});
+        games={blue:0,red:0};
+      } else if(games.blue===6 && games.red===6){
+        tieBreak = true;
+      }
+      playSoundRepeat(team==="blue"?sndBlue:sndRed,4);
+      updateDisplay();
+    }
+
+
+    function undoLast(){
+      if(history.length>0){
+        let prev = JSON.parse(history.pop());
+        scores=prev.scores;
+        games=prev.games;
+        sets=prev.sets;
+        tieBreak=prev.tieBreak;
+        setHistory=prev.setHistory;
+        playSound(sndUndo);
+        updateDisplay();
+      }
+    }
+
+
+    function resetMatch(){
+      if(confirm("¿Reiniciar el partido?")){
+        scores={blue:0,red:0};
+        games={blue:0,red:0};
+        sets={blue:0,red:0};
+        tieBreak=false;
+        history=[];
+        setHistory=[];
+        document.getElementById("draftBtn").disabled = false;
+        updateDisplay();
+      }
+    }
+
+
+    function playSound(s){ if(soundOn) s.play(); }
+    function playSoundRepeat(s,n){ if(soundOn){ for(let i=0;i<n;i++){ setTimeout(()=>s.play(),i*400); } } }
+
+
+    function flash(team){
+      let el=document.getElementById(team+"Score");
+      el.classList.add("flash");
+      setTimeout(()=>el.classList.remove("flash"),5000);
+    }
+
+
+    function startCooldown(){ cooldown=true; setTimeout(()=>cooldown=false,5000); }
+    function toggleSound(){ soundOn=!soundOn; }
+
+
+    // ------------ Veu ------------
+    let recognition = null;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(SpeechRecognition){
+      recognition = new SpeechRecognition();
+      recognition.lang = "es-ES";
+      recognition.continuous = true;
+      recognition.interimResults = false;
+
+
+      recognition.onresult = (event)=>{
+        const transcript = event.results[event.results.length-1][0].transcript.toLowerCase();
+        if(transcript.includes("equipo azul")) addPoint("blue");
+        if(transcript.includes("equipo rojo")) addPoint("red");
+        if(transcript.includes("cancelar"))    undoLast();
+      };
+
+
+      recognition.onend = ()=>{ if(listening){ try{ recognition.start(); }catch{} } };
+    }
+
+
+    function toggleMic(){
+      if(!recognition){
+        alert("El navegador no soporta reconocimiento de voz.");
+        return;
+      }
+      if(listening){
+        recognition.stop();
+        listening=false;
+        document.getElementById("listenIndicator").style.display="none";
+      } else {
+        try{
+          recognition.start();
+          listening=true;
+          document.getElementById("listenIndicator").style.display="block";
+        }catch(e){
+          alert("Activa los permisos de micrófono en Chrome para que funcione.");
+        }
+      }
+    }
+
+
+    function renderHistory(){
+      const body=document.getElementById("historyBody");
+      body.innerHTML="";
+      setHistory.forEach((set,i)=>{
+        body.innerHTML+=`<tr><td>${i+1}</td><td>${set.blue}</td><td>${set.red}</td></tr>`;
+      });
+    }
+
+
+    function updateHeaders(){
+      const blueName = document.getElementById("bluePlayer1").value + " / " + document.getElementById("bluePlayer2").value;
+      const redName = document.getElementById("redPlayer1").value + " / " + document.getElementById("redPlayer2").value;
+      document.getElementById("blueHeader").innerText = blueName;
+      document.getElementById("redHeader").innerText = redName;
+    }
+
+
+    // Draft equipos
+    function draftTeams(){
+      const players = [
+        document.getElementById("bluePlayer1").value,
+        document.getElementById("bluePlayer2").value,
+        document.getElementById("redPlayer1").value,
+        document.getElementById("redPlayer2").value
+      ];
+      const draftSound = new Audio("https://actions.google.com/sounds/v1/cartoon/woodpecker_pecking.ogg");
+      const confirmSound = new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
+      let interval = setInterval(()=>draftSound.play(),300);
+      setTimeout(()=>{
+        clearInterval(interval);
+        confirmSound.play();
+        players.sort(()=>Math.random()-0.5);
+        document.getElementById("bluePlayer1").value=players[0];
+        document.getElementById("bluePlayer2").value=players[1];
+        document.getElementById("redPlayer1").value=players[2];
+        document.getElementById("redPlayer2").value=players[3];
+        updateHeaders();
+      },2000);
+    }
+
+
+    updateHeaders();
+    updateDisplay();
+  </script>
 </body>
 </html>
